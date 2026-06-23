@@ -19,6 +19,7 @@ from app.plugins.schema_utils import (
 from app.utils import get_logger
 
 from .constants import TASK_MODE_ZH
+from .template_renderer import render_template
 
 logger = get_logger("MAA 专项适配")
 
@@ -34,6 +35,30 @@ def _read_notify_channels(script_config: Any | None) -> list[str]:
     except Exception:
         return []
     return raw_channels if isinstance(raw_channels, list) else []
+
+
+def _build_proxy_result_payload(
+    title: str, result: dict[str, Any]
+) -> dict[str, Any]:
+    # 将 MAA 汇总结果转换为 notify 服务的通用 payload。
+    message_text = (
+        f"任务开始时间: {result['start_time']}, "
+        f"结束时间: {result['end_time']}\n"
+        f"已完成数: {result['completed_count']}, "
+        f"未完成数: {result['uncompleted_count']}\n\n"
+        f"{result['result']}"
+    )
+    serverchan_message = message_text.replace("\n", "\n\n")
+    return {
+        "kind": "proxy_result",
+        "title": title,
+        "text": message_text,
+        "serverchan_content": f"{serverchan_message}\nAUTO-MAS 敬上",
+        "koishi_message": f"{title}\n\n{message_text}\nAUTO-MAS 敬上",
+        "mail_mode": "网页",
+        "mail_content": render_template("MAA_result.html", result),
+        "data": result,
+    }
 
 
 async def _push_system_notification(
@@ -290,9 +315,6 @@ class MaaAdapterHooks(ScriptAdapterHooks):
 
     async def finalize(self, runtime: ScriptAdapterRuntime) -> None:
         # 执行任务结束后的统一收尾。
-        from app.core.config import Config
-        from .maa_task.tools.notify import push_notification
-
         if runtime.check_result != "Pass":
             runtime.script_info.status = "异常"
             return
@@ -383,22 +405,17 @@ class MaaAdapterHooks(ScriptAdapterHooks):
                 timeout=10,
                 channels=notify_channels,
             )
-            try:
-                await push_notification(
-                    "代理结果",
-                    title,
-                    result,
-                    None,
-                    notify_service=notify_service,
-                    notify_channels=notify_channels,
-                )
-            except Exception as error:
-                logger.exception(f"推送代理结果时出现异常: {error}")
-                await Config.send_websocket_message(
-                    id=runtime.task_info.task_id,
-                    type="Info",
-                    data={"Error": f"推送代理结果时出现异常: {error}"},
-                )
+            if notify_service is not None:
+                try:
+                    if await notify_service.should_send_task_result(result):
+                        await notify_service.send_payload(
+                            _build_proxy_result_payload(title, result),
+                            channels=notify_channels,
+                        )
+                except Exception as error:
+                    logger.warning(
+                        f"notify 代理结果发送失败: {type(error).__name__}: {error}"
+                    )
 
         # 恢复 MAA 原始配置并清理临时目录。
         maa_set_path: Path | None = runtime.extra.get("maa_set_path")

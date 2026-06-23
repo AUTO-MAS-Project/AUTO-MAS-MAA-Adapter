@@ -48,8 +48,9 @@ from ..constants import (
     UTC4,
     UTC8,
 )
+from ..template_renderer import render_template
 
-from .tools import push_notification, agree_bilibili, update_maa
+from .tools import agree_bilibili, update_maa
 
 logger = get_logger("MAA 自动代理")
 
@@ -113,6 +114,188 @@ class AutoProxyTask(TaskExecuteBase):
             )
         except Exception as exc:
             logger.warning(f"notify 系统通知发送失败: {type(exc).__name__}: {exc}")
+
+    async def _should_send_notification(
+        self, policy_method: str, *args: Any
+    ) -> bool:
+        if self.notify_service is None:
+            return False
+
+        checker = getattr(self.notify_service, policy_method, None)
+        if not callable(checker):
+            logger.warning(f"notify 服务未提供策略方法: {policy_method}")
+            return False
+
+        try:
+            return bool(await checker(*args))
+        except Exception as exc:
+            logger.warning(
+                f"notify 通知策略检查失败: {type(exc).__name__}: {exc}"
+            )
+            return False
+
+    async def _send_notification_payload(self, payload: dict[str, Any]) -> None:
+        if self.notify_service is None:
+            return
+
+        try:
+            await self.notify_service.send_payload(
+                payload,
+                channels=self.notify_channels,
+            )
+        except Exception as exc:
+            logger.warning(f"notify 通知发送失败: {type(exc).__name__}: {exc}")
+
+    async def _send_user_direct_notification(
+        self,
+        *,
+        enabled_field: str,
+        title: str,
+        mail_content: str,
+        serverchan_content: str,
+    ) -> None:
+        if self.notify_service is None:
+            return
+        if not self.cur_user_config.get("Notify", "Enabled"):
+            return
+        if not self.cur_user_config.get("Notify", enabled_field):
+            return
+
+        channel_selected = getattr(
+            self.notify_service, "is_channel_selected", None
+        )
+        if not callable(channel_selected):
+            logger.warning("notify 服务未提供 is_channel_selected()")
+            return
+
+        if (
+            self.cur_user_config.get("Notify", "IfSendMail")
+            and channel_selected(self.notify_channels, "mail")
+        ):
+            to_address = self.cur_user_config.get("Notify", "ToAddress")
+            if not to_address:
+                logger.error("用户邮箱地址为空, 无法发送用户单独的邮件通知")
+            else:
+                try:
+                    await self.notify_service.send_mail(
+                        mode="网页",
+                        title=title,
+                        content=mail_content,
+                        to_address=to_address,
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        f"notify 用户邮件发送失败: {type(exc).__name__}: {exc}"
+                    )
+
+        if (
+            self.cur_user_config.get("Notify", "IfServerChan")
+            and channel_selected(self.notify_channels, "serverchan")
+        ):
+            send_key = self.cur_user_config.get("Notify", "ServerChanKey")
+            if not send_key:
+                logger.error(
+                    "用户ServerChan密钥为空, 无法发送用户单独的ServerChan通知"
+                )
+            else:
+                try:
+                    await self.notify_service.send_serverchan(
+                        title=title,
+                        content=serverchan_content,
+                        send_key=send_key,
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        f"notify 用户 ServerChan 发送失败: "
+                        f"{type(exc).__name__}: {exc}"
+                    )
+
+    async def _send_six_star_notification(self) -> None:
+        # 构造六星事件并交由 notify 服务处理。
+        title = f"喜报: 用户 {self.cur_user_item.name} 公招出六星啦！"
+        data = {"user_name": self.cur_user_item.name}
+        mail_content = render_template("MAA_six_star.html", data)
+        serverchan_content = "好羡慕~\nAUTO-MAS 敬上"
+
+        if await self._should_send_notification("should_send_six_star"):
+            await self._send_notification_payload(
+                {
+                    "kind": "six_star",
+                    "title": title,
+                    "text": "好羡慕~",
+                    "serverchan_content": serverchan_content,
+                    "koishi_message": (
+                        f"{title}\n\n好羡慕~\nAUTO-MAS 敬上"
+                    ),
+                    "mail_mode": "网页",
+                    "mail_content": mail_content,
+                    "data": data,
+                }
+            )
+
+        await self._send_user_direct_notification(
+            enabled_field="IfSendSixStar",
+            title=title,
+            mail_content=mail_content,
+            serverchan_content=serverchan_content,
+        )
+
+    async def _send_statistic_notification(
+        self, statistics: dict[str, Any], success_symbol: str
+    ) -> None:
+        # 构造统计事件并交由 notify 服务处理。
+        title = (
+            f"{datetime.now().strftime('%m-%d')} |{success_symbol}|  "
+            f"{self.cur_user_item.name} 的自动代理统计报告"
+        )
+        drop_lines = []
+        for stage, items in statistics.get("drop_statistics", {}).items():
+            drop_lines.append(f"掉落统计（{stage}）:")
+            for item, quantity in items.items():
+                drop_lines.append(f"  {item}: {quantity}")
+        drop_text = "\n".join(drop_lines)
+
+        recruit_lines = ["招募统计:"]
+        for star, count in statistics.get("recruit_statistics", {}).items():
+            recruit_lines.append(f"  {star}: {count}")
+        recruit_text = "\n".join(recruit_lines)
+
+        text = (
+            f"开始时间: {statistics['start_time']}\n"
+            f"结束时间: {statistics['end_time']}\n"
+            f"理智剩余: {statistics.get('sanity', '未知')}\n"
+            f"回复时间: {statistics.get('sanity_full_at', '未知')}\n"
+            f"MAA执行结果: {statistics['maa_result']}\n"
+            f"{recruit_text}\n"
+            f"{drop_text}"
+        )
+        mail_content = render_template("MAA_statistics.html", statistics)
+        serverchan_content = (
+            f"{text.replace(chr(10), chr(10) * 2)}\nAUTO-MAS 敬上"
+        )
+
+        if await self._should_send_notification("should_send_statistic"):
+            await self._send_notification_payload(
+                {
+                    "kind": "statistic",
+                    "title": title,
+                    "text": text,
+                    "serverchan_content": serverchan_content,
+                    "koishi_message": (
+                        f"{title}\n\n{text}\nAUTO-MAS 敬上"
+                    ),
+                    "mail_mode": "网页",
+                    "mail_content": mail_content,
+                    "data": statistics,
+                }
+            )
+
+        await self._send_user_direct_notification(
+            enabled_field="IfSendStatistic",
+            title=title,
+            mail_content=mail_content,
+            serverchan_content=serverchan_content,
+        )
 
     async def check(self) -> str:
 
@@ -714,31 +897,9 @@ class AutoProxyTask(TaskExecuteBase):
         if_success = self.run_book["Annihilation"] and self.run_book["Routine"]
         success_symbol = "√" if if_success else "X"
 
-        try:
-            if if_six_star:
-                await push_notification(
-                    "公招六星",
-                    f"喜报: 用户 {self.cur_user_item.name} 公招出六星啦！",
-                    {"user_name": self.cur_user_item.name},
-                    self.cur_user_config,
-                    notify_service=self.notify_service,
-                    notify_channels=self.notify_channels,
-                )
-            await push_notification(
-                "统计信息",
-                f"{datetime.now().strftime('%m-%d')} |{success_symbol}|  {self.cur_user_item.name} 的自动代理统计报告",
-                statistics,
-                self.cur_user_config,
-                notify_service=self.notify_service,
-                notify_channels=self.notify_channels,
-            )
-        except Exception as e:
-            logger.exception(f"推送通知时出现异常: {e}")
-            await Config.send_websocket_message(
-                id=self.task_info.task_id,
-                type="Info",
-                data={"Error": f"推送通知时出现异常: {e}"},
-            )
+        if if_six_star:
+            await self._send_six_star_notification()
+        await self._send_statistic_notification(statistics, success_symbol)
 
         if self.run_book["Annihilation"] and self.run_book["Routine"]:
             if (
