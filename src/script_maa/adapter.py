@@ -271,11 +271,10 @@ class MaaAdapterHooks(ScriptAdapterHooks):
             f"用户列表加载完成, 已筛选用户数: {len(runtime.script_info.user_list)}"
         )
 
-    def run_auto_proxy(self, runtime: ScriptAdapterRuntime, user_index: int):
+    def run_auto_proxy(self, runtime: ScriptAdapterRuntime):
         # 创建自动代理任务。
         from .maa_task.AutoProxy import AutoProxyTask
 
-        _ = user_index
         return AutoProxyTask(
             runtime.script_info,
             runtime.script_config,
@@ -285,11 +284,10 @@ class MaaAdapterHooks(ScriptAdapterHooks):
             notify_channels=_read_notify_channels(runtime.script_config),
         )
 
-    def run_manual_review(self, runtime: ScriptAdapterRuntime, user_index: int):
+    def run_manual_review(self, runtime: ScriptAdapterRuntime):
         # 创建人工排查任务。
         from .maa_task.ManualReview import ManualReviewTask
 
-        _ = user_index
         return ManualReviewTask(
             runtime.script_info,
             runtime.script_config,
@@ -297,11 +295,10 @@ class MaaAdapterHooks(ScriptAdapterHooks):
             runtime.require_emulator_manager(),
         )
 
-    def run_script_config(self, runtime: ScriptAdapterRuntime, user_index: int):
+    def run_script_config(self, runtime: ScriptAdapterRuntime):
         # 创建脚本配置任务。
         from .maa_task.ScriptConfig import ScriptConfigTask
 
-        _ = user_index
         return ScriptConfigTask(
             runtime.script_info,
             runtime.script_config,
