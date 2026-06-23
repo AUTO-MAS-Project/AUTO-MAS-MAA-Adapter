@@ -237,11 +237,7 @@ class MaaAdapterHooks(ScriptAdapterHooks):
         temp_path = Path.cwd() / f"data/{runtime.script_info.script_id}/Temp"
         runtime.extra["maa_set_path"] = maa_set_path
         runtime.extra["temp_path"] = temp_path
-        emulator_service = runtime.get_service("emulator")
-        get_emulator_instance = getattr(emulator_service, "get_instance", None)
-        if not callable(get_emulator_instance):
-            raise RuntimeError("emulator 服务不可用或未提供 get_instance()")
-        runtime.extra["emulator_manager"] = await get_emulator_instance(
+        await runtime.initialize_emulator_manager(
             script_config.get("Emulator", "Id")
         )
 
@@ -284,7 +280,7 @@ class MaaAdapterHooks(ScriptAdapterHooks):
             runtime.script_info,
             runtime.script_config,
             runtime.user_config,
-            runtime.extra.get("emulator_manager"),
+            runtime.require_emulator_manager(),
             notify_service=runtime.get_service("notify"),
             notify_channels=_read_notify_channels(runtime.script_config),
         )
@@ -298,7 +294,7 @@ class MaaAdapterHooks(ScriptAdapterHooks):
             runtime.script_info,
             runtime.script_config,
             runtime.user_config,
-            runtime.extra.get("emulator_manager"),
+            runtime.require_emulator_manager(),
         )
 
     def run_script_config(self, runtime: ScriptAdapterRuntime, user_index: int):
@@ -310,7 +306,7 @@ class MaaAdapterHooks(ScriptAdapterHooks):
             runtime.script_info,
             runtime.script_config,
             runtime.user_config,
-            runtime.extra.get("emulator_manager"),
+            runtime.require_emulator_manager(),
         )
 
     async def finalize(self, runtime: ScriptAdapterRuntime) -> None:
@@ -334,7 +330,7 @@ class MaaAdapterHooks(ScriptAdapterHooks):
 
         if runtime.mode in ("AutoProxy", "ManualReview"):
             # 关闭模拟器并写回用户运行数据。
-            emulator_manager = runtime.extra.get("emulator_manager")
+            emulator_manager = runtime.emulator_manager
             if emulator_manager is not None:
                 await emulator_manager.close(script_config.get("Emulator", "Index"))
 
