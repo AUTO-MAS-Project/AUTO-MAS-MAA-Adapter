@@ -1,14 +1,11 @@
 from __future__ import annotations
 
-import json
 import shutil
-import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from app.core.script_types import is_script_config_compatible_with_type_key
-from app.models.ConfigBase import MultipleConfig
 from app.models.task import UserItem
 from app.plugins import ScriptAdapterHooks, ScriptAdapterRuntime
 from app.plugins.schema_utils import (
@@ -218,18 +215,18 @@ class MaaAdapterHooks(ScriptAdapterHooks):
 
     async def prepare(self, runtime: ScriptAdapterRuntime) -> None:
         # 锁定脚本配置。
-        storage_script_config = runtime.get_storage_script_config()
-        await storage_script_config.lock()
+        await runtime.storage.lock()
+        try:
+            await self._prepare_locked(runtime)
+        except Exception:
+            await runtime.storage.unlock()
+            raise
 
+    async def _prepare_locked(self, runtime: ScriptAdapterRuntime) -> None:
         # 构建运行时脚本配置与用户配置。
-        script_config = runtime.script_config or await runtime.build_script_model()
+        script_config = runtime.script_config or await runtime.storage.load_script_model()
         runtime.script_config = script_config
-        provider = runtime._resolve_provider()
-        runtime.user_config = MultipleConfig([provider.user_config_class])
-        for user_uid, user_model in await runtime.build_user_models():
-            uid = uuid.UUID(user_uid)
-            runtime.user_config.order.append(uid)
-            runtime.user_config.data[uid] = user_model
+        runtime.user_config = await runtime.storage.load_user_collection()
         logger.success(f"{runtime.script_info.script_id} 已锁定, MAA 配置提取完成")
 
         # 记录配置目录并获取模拟器实例。
@@ -321,8 +318,7 @@ class MaaAdapterHooks(ScriptAdapterHooks):
         logger.info("MAA 主任务已结束, 开始执行后续操作")
         notify_service = runtime.get_service("notify")
         notify_channels = _read_notify_channels(script_config)
-        storage_script_config = runtime.get_storage_script_config()
-        await storage_script_config.unlock()
+        await runtime.storage.unlock()
         logger.success(f"已解锁脚本配置 {runtime.script_info.script_id}")
 
         if runtime.mode in ("AutoProxy", "ManualReview"):
@@ -331,35 +327,7 @@ class MaaAdapterHooks(ScriptAdapterHooks):
             if emulator_manager is not None:
                 await emulator_manager.close(script_config.get("Emulator", "Index"))
 
-            from app.core.script_config_codec import form_to_storage, storage_to_form
-            from app.models.plugin_script_config import PluginUserConfig
-
-            provider = runtime._resolve_provider()
-            for user_uid, user_model in runtime.user_config.items():
-                storage_user = storage_script_config.UserData[user_uid]
-                if isinstance(storage_user, PluginUserConfig):
-                    user_payload = await user_model.toDict(if_decrypt=False)
-                    storage_payload = await form_to_storage(provider, user_payload, "user")
-                    await storage_user.set(
-                        "PluginData",
-                        "Config",
-                        json.dumps(storage_payload, ensure_ascii=False),
-                    )
-                    form_payload = await storage_to_form(provider, storage_payload, "user")
-                    user_name = form_payload.get("user_name")
-                    if not isinstance(user_name, str) or not user_name.strip():
-                        info = form_payload.get("Info")
-                        user_name = (
-                            info.get("Name")
-                            if isinstance(info, dict) and isinstance(info.get("Name"), str)
-                            else str(user_uid)
-                        )
-                    await storage_user.set("Info", "Name", user_name.strip())
-                else:
-                    await storage_script_config.UserData.load(
-                        await runtime.user_config.toDict()
-                    )
-                    break
+            await runtime.storage.save_user_models(runtime.user_config)
 
             # 汇总用户执行结果并发送任务报告。
             error_user = [
