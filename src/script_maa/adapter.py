@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import shutil
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
 from app.core.script_types import is_script_config_compatible_with_type_key
@@ -197,18 +195,22 @@ class MaaAdapterHooks(ScriptAdapterHooks):
         ) in ("", "-"):
             return "未完成模拟器配置, 请检查脚本配置中的模拟器设置！"
 
-        if not (Path(script_config.get("Info", "Path")) / "MAA.exe").exists():
+        maa_root_path = runtime.script_root_path(script_config)
+        maa_config_path = runtime.script_config_dir(script_config)
+
+        if not (maa_root_path / "MAA.exe").exists():
             return "MAA.exe 文件不存在，请检查 MAA 路径设置！"
 
         if not (
-            (Path(script_config.get("Info", "Path")) / "config/gui.json").exists()
-            and (Path(script_config.get("Info", "Path")) / "config/gui.new.json").exists()
+            (maa_config_path / "gui.json").exists()
+            and (maa_config_path / "gui.new.json").exists()
         ):
             return "MAA 配置文件不存在，请检查 MAA 路径设置或先启动 MAA 生成配置文件！"
 
-        if runtime.mode != "ScriptConfig" and not (
-            Path.cwd() / f"data/{runtime.script_info.script_id}/Default/ConfigFile"
-        ).exists():
+        if (
+            runtime.mode != "ScriptConfig"
+            and not runtime.default_config_file_path().exists()
+        ):
             return "未完成 MAA 全局配置，请先配置 MAA！"
 
         return "Pass"
@@ -230,18 +232,12 @@ class MaaAdapterHooks(ScriptAdapterHooks):
         logger.success(f"{runtime.script_info.script_id} 已锁定, MAA 配置提取完成")
 
         # 记录配置目录并获取模拟器实例。
-        maa_set_path = Path(script_config.get("Info", "Path")) / "config"
-        temp_path = Path.cwd() / f"data/{runtime.script_info.script_id}/Temp"
-        runtime.extra["maa_set_path"] = maa_set_path
-        runtime.extra["temp_path"] = temp_path
+        workspace = runtime.create_script_config_workspace(script_config)
         await runtime.initialize_emulator_manager(
             script_config.get("Emulator", "Id")
         )
-
         # 备份 MAA 原始配置。
-        temp_path.mkdir(parents=True, exist_ok=True)
-        if maa_set_path.exists():
-            shutil.copytree(maa_set_path, temp_path, dirs_exist_ok=True)
+        workspace.backup()
 
         # 构建本次任务需要执行的用户列表。
         if runtime.mode == "ScriptConfig":
@@ -379,13 +375,8 @@ class MaaAdapterHooks(ScriptAdapterHooks):
                     )
 
         # 恢复 MAA 原始配置并清理临时目录。
-        maa_set_path: Path | None = runtime.extra.get("maa_set_path")
-        temp_path: Path | None = runtime.extra.get("temp_path")
-        if maa_set_path is not None and temp_path is not None:
-            if temp_path.exists():
-                shutil.rmtree(maa_set_path, ignore_errors=True)
-                shutil.copytree(temp_path, maa_set_path, dirs_exist_ok=True)
-            shutil.rmtree(temp_path, ignore_errors=True)
+        if runtime.config_workspace is not None:
+            runtime.config_workspace.restore()
 
         runtime.script_info.status = "完成"
 
