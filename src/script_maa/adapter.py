@@ -3,7 +3,6 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from app.core.script_types import is_script_config_compatible_with_type_key
 from app.models.task import UserItem
 from app.plugins import ScriptAdapterHooks, ScriptAdapterRuntime
 from app.plugins.schema_utils import (
@@ -187,7 +186,7 @@ class MaaAdapterHooks(ScriptAdapterHooks):
 
         script_config = await runtime.build_script_model()
         runtime.script_config = script_config
-        if not is_script_config_compatible_with_type_key(script_config, "MAA"):
+        if runtime.type_key != "MAA":
             return "脚本配置类型错误, 不是 MAA 脚本类型"
 
         if script_config.get("Emulator", "Id") == "-" or script_config.get(
