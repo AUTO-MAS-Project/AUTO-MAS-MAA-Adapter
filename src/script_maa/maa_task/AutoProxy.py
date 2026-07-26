@@ -24,13 +24,13 @@ import json
 import uuid
 import asyncio
 import shutil
+from collections.abc import Mapping
 from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Any
 
 from app.core import Config
 from app.models.task import TaskExecuteBase, ScriptItem, LogRecord
-from app.models.ConfigBase import MultipleConfig
 from app.models.emulator import DeviceInfo, DeviceBase
 from app.services import System
 from app.tools import skland_sign_in
@@ -69,7 +69,7 @@ class AutoProxyTask(TaskExecuteBase):
         self,
         script_info: ScriptItem,
         script_config: Any,
-        user_config: MultipleConfig[Any],
+        user_config: Mapping[uuid.UUID, Any],
         emulator_manager: DeviceBase,
         notify_service: Any | None = None,
         notify_channels: list[str] | None = None,

@@ -24,13 +24,13 @@ import json
 import uuid
 import asyncio
 import shutil
+from collections.abc import Mapping
 from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Any
 
 from app.core import Config, Broadcast
 from app.models.task import TaskExecuteBase, ScriptItem, LogRecord
-from app.models.ConfigBase import MultipleConfig
 from app.models.emulator import DeviceInfo, DeviceBase
 from app.services import System
 from app.utils import get_logger, LogMonitor, ProcessManager
@@ -49,7 +49,7 @@ class ManualReviewTask(TaskExecuteBase):
         self,
         script_info: ScriptItem,
         script_config: Any,
-        user_config: MultipleConfig[Any],
+        user_config: Mapping[uuid.UUID, Any],
         emulator_manager: DeviceBase,
     ):
         super().__init__()
