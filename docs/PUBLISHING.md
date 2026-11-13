@@ -38,11 +38,13 @@ uvx --from twine twine check --strict dist/*
 ```
 
 发布时，`pyproject.toml` 中的版本与标签必须一致。
-当前首版保持 `0.1.0`，在确认所选提交可发布后执行：
+`v0.1.0` 已指向第一次失败的发布提交，不能靠重新运行该标签发布修正后的代码。
+修复当前元数据后，下一次发布应先通过插件发布流程推进版本，再创建匹配的新标签；不移动旧标签。
+例如完成 `0.1.1` 的版本更新后执行：
 
 ```powershell
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.1.1
+git push origin v0.1.1
 ```
 
 进入 Actions 的「构建并发布 PyPI 包」，确认构建、元数据校验和发布三个步骤成功。
@@ -58,7 +60,9 @@ git push origin v0.1.0
 2. 该环境不能同时通过 `plugins/maa_adapter` 自动发现本地源码。
    本地源码可能覆盖已安装发行版，不能以这种状态证明 PyPI 安装成功。
 3. 插件市场选择能查询到新包的 PyPI 源并刷新，找到「MAA 专项」。
-   元数据包含市场门禁 `auto-mas-plugin`、唯一 ID `auto-mas-id:maa_adapter`，以及展示名、描述和标签的多语言声明。
+   Keywords 包含市场门禁 `auto-mas-plugin` 与唯一 ID `auto-mas-id:maa_adapter`。
+   README 开头的 `auto-mas:i18n` HTML 注释统一声明 `display_name_i18n`、`description_i18n` 和 `tags_i18n`；
+   PyPI JSON、源码发现和已安装包都读取这份正文，`project.urls` 只声明真实 HTTP/HTTPS 链接。
 4. 安装并启用，核对包名 `auto-mas-maa-adapter`、版本、安装来源及插件状态，再新建 MAA 托管。
    若镜像未同步，可暂时选择官方 PyPI，不能把镜像尚未同步误判为发布失败。
 5. 核对关卡选项、配置/查看会话、插件禁用与重新启用；真实自动代理另按账号和模拟器验证流程执行。

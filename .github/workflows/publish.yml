@@ -37,6 +37,25 @@ jobs:
         run: python -m build
       - name: 校验包元数据
         run: python -m twine check --strict dist/*
+      - name: 校验分发包中的项目链接
+        run: |
+          python - <<'PY'
+          from email import policy
+          from email.parser import BytesParser
+          from pathlib import Path
+          from urllib.parse import urlsplit
+          from zipfile import ZipFile
+
+          for path in Path("dist").glob("*.whl"):
+              with ZipFile(path) as wheel:
+                  name = next(item for item in wheel.namelist() if item.endswith(".dist-info/METADATA"))
+                  metadata = BytesParser(policy=policy.default).parsebytes(wheel.read(name))
+              for value in metadata.get_all("Project-URL", []):
+                  label, url = str(value).split(",", 1)
+                  parsed = urlsplit(url.strip())
+                  if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+                      raise SystemExit(f"{label} 必须是有效的 HTTP/HTTPS 项目链接")
+          PY
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: python-distributions
