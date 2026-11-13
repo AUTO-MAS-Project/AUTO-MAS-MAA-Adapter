@@ -1,6 +1,6 @@
-# 发布 auto-mas-maa
+# 发布 auto-mas-maa-adapter
 
-本仓库发布名为 `auto-mas-maa`，Python 导入名和插件 ID 均为 `maa_adapter`。
+本仓库发布名为 `auto-mas-maa-adapter`，Python 导入名和插件 ID 均为 `maa_adapter`。
 当前版本为 `0.1.0`，面向已完成插件框架迁移的 AUTO-MAS 宿主，Python 为 3.12。
 旧 `automas_script_maa` / `script_maa` 来源适配保留在 Git 历史，不与本包同时构建。
 
@@ -11,12 +11,15 @@
    **通过市场安装不要求先将 core SDK 发布到 PyPI**，也不要删除包的 SDK 依赖。
    独立使用 pip 安装时才需要额外提供 SDK wheel 或已发布的兼容 SDK。
    尚未包含本轮插件框架的公开宿主，不能用于验证这个包。
-2. 登录 PyPI，启用账号的双重验证，在账户 **Publishing** 页面新增 pending publisher：
-   - PyPI project name：`auto-mas-maa`
+2. 使用个人 PyPI 账号登录并启用双重验证，在账户 **Publishing** 页面新增 pending publisher：
+   - PyPI project name：`auto-mas-maa-adapter`
    - Owner：`AUTO-MAS-Project`
    - Repository name：`AUTO-MAS-MAA-Adapter`
    - Workflow name：`publish.yml`（文件名，不是工作流显示名称）
    - Environment name：`pypi`
+
+   这里的 Owner 是 GitHub 仓库所有者；即使使用个人 PyPI 账号，仍填写 `AUTO-MAS-Project`。
+   PyPI 个人账号与 GitHub Owner 不要求同名，组织获批后可再移交 PyPI 项目。
 3. 在 GitHub 仓库 Settings → Environments 创建 `pypi` 环境，允许预期的发布标签。
    可以设置维护者审核；工作流只给发布任务授予 `id-token: write`。
 4. 确认 Actions 已启用，并将校验通过的迁移代码纳入用于发布的分支。
@@ -56,7 +59,7 @@ git push origin v0.1.0
    本地源码可能覆盖已安装发行版，不能以这种状态证明 PyPI 安装成功。
 3. 插件市场选择能查询到新包的 PyPI 源并刷新，找到「MAA 专项」。
    元数据包含市场门禁 `auto-mas-plugin`、唯一 ID `auto-mas-id:maa_adapter`，以及展示名、描述和标签的多语言声明。
-4. 安装并启用，核对包名 `auto-mas-maa`、版本、安装来源及插件状态，再新建 MAA 托管。
+4. 安装并启用，核对包名 `auto-mas-maa-adapter`、版本、安装来源及插件状态，再新建 MAA 托管。
    若镜像未同步，可暂时选择官方 PyPI，不能把镜像尚未同步误判为发布失败。
 5. 核对关卡选项、配置/查看会话、插件禁用与重新启用；真实自动代理另按账号和模拟器验证流程执行。
 

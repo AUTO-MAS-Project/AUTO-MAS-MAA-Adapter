@@ -4,7 +4,7 @@
 
 ## 安装与发布
 
-发行包名为 **`auto-mas-maa`**，Python 导入名和插件 ID 为 **`maa_adapter`**。
+发行包名为 **`auto-mas-maa-adapter`**，Python 导入名和插件 ID 为 **`maa_adapter`**。
 依赖 **`auto-mas-core>=5.8,<5.9`** 与 Python 3.12；需要本轮已迁移插件框架的宿主。
 插件从市场安装后，不需要单独安装 MAA 适配源码。
 
