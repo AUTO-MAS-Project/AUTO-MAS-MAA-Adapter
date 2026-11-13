@@ -1,7 +1,7 @@
 # 发布 auto-mas-maa-adapter
 
 本仓库发布名为 `auto-mas-maa-adapter`，Python 导入名和插件 ID 均为 `maa_adapter`。
-当前版本为 `0.1.0`，面向已完成插件框架迁移的 AUTO-MAS 宿主，Python 为 3.12。
+当前版本为 `0.1.1`，面向已完成插件框架迁移的 AUTO-MAS 宿主，Python 为 3.12。
 旧 `automas_script_maa` / `script_maa` 来源适配保留在 Git 历史，不与本包同时构建。
 
 ## 首次发布准备
@@ -40,7 +40,7 @@ uvx --from twine twine check --strict dist/*
 发布时，`pyproject.toml` 中的版本与标签必须一致。
 `v0.1.0` 已指向第一次失败的发布提交，不能靠重新运行该标签发布修正后的代码。
 修复当前元数据后，下一次发布应先通过插件发布流程推进版本，再创建匹配的新标签；不移动旧标签。
-例如完成 `0.1.1` 的版本更新后执行：
+本次已将版本更新为 `0.1.1`，确认所选提交包含 README 元数据修正后执行：
 
 ```powershell
 git tag v0.1.1
