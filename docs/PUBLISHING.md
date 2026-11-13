@@ -6,9 +6,11 @@
 
 ## 首次发布准备
 
-1. 先发布与当前宿主一致的 `auto-mas-core>=5.8,<5.9` SDK。
-   MAA wheel 不内置宿主，也不能通过删除 SDK 依赖解决安装问题。
-   当前公开宿主若尚未包含本轮插件框架，需要先使用对应迁移版本的宿主。
+1. 准备本轮已完成插件框架迁移的宿主，确认内置 core 满足 `>=5.8,<5.9`。
+   市场安装器会向依赖解析器提供当前宿主 core 的本地元数据，并复用宿主 SDK 源码；
+   **通过市场安装不要求先将 core SDK 发布到 PyPI**，也不要删除包的 SDK 依赖。
+   独立使用 pip 安装时才需要额外提供 SDK wheel 或已发布的兼容 SDK。
+   尚未包含本轮插件框架的公开宿主，不能用于验证这个包。
 2. 登录 PyPI，启用账号的双重验证，在账户 **Publishing** 页面新增 pending publisher：
    - PyPI project name：`auto-mas-maa`
    - Owner：`AUTO-MAS-Project`
