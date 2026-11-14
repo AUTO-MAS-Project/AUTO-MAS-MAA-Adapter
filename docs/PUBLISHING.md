@@ -1,12 +1,12 @@
 # 发布 auto-mas-maa-adapter
 
 本仓库发布名为 `auto-mas-maa-adapter`，Python 导入名和插件 ID 均为 `maa_adapter`。
-当前版本为 `0.1.1`，面向已完成插件框架迁移的 AUTO-MAS 宿主，Python 为 3.12。
+当前版本为 `0.1.2`，面向已完成插件框架迁移的 AUTO-MAS 宿主，Python 为 3.12。
 旧 `automas_script_maa` / `script_maa` 来源适配保留在 Git 历史，不与本包同时构建。
 
 ## 首次发布准备
 
-1. 准备本轮已完成插件框架迁移的宿主，确认内置 core 满足 `>=5.8,<5.9`。
+1. 准备本轮已完成插件框架迁移的宿主，确认内置 core 满足 `>=5,<6`。
    市场安装器会向依赖解析器提供当前宿主 core 的本地元数据，并复用宿主 SDK 源码；
    **通过市场安装不要求先将 core SDK 发布到 PyPI**，也不要删除包的 SDK 依赖。
    独立使用 pip 安装时才需要额外提供 SDK wheel 或已发布的兼容 SDK。

@@ -23,5 +23,12 @@ async def check_prefetch(config) -> list:
         else await check_software_download(root, config)
     )
     if github or enabled and cdk is not None:
-        requests.extend(await check_resource_download(root, github=github, cdk=cdk))
+        requests.extend(
+            await check_resource_download(
+                root,
+                github=github,
+                cdk=cdk,
+                incremental=config.Update.PackageMode == "incremental",
+            )
+        )
     return requests

@@ -434,6 +434,7 @@ class MaaManager(UserExpander[MaaConfig]):
             await stage_service.get_stage()
 
         self.prepared = True
+        await self._recover_unconfirmed_update()
         if self.task_info.mode != TaskMode.AUTO_PROXY:
             await self._prepare_default_user()
         elif self.script_config.Run.IfCheckGameUpdate:
@@ -885,6 +886,7 @@ class MaaManager(UserExpander[MaaConfig]):
             cdk=cdk,
             github=github,
             progress=resource_progress,
+            incremental=self.script_config.Update.PackageMode == "incremental",
         )
         return True
 
