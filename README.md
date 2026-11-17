@@ -43,14 +43,14 @@ PyPI Trusted Publishing、构建、打标签发布及市场安装验证见 [发�
 
 ## 使用
 
-源码工作区及 Runtime 源码目录发现本插件后，首次按随附插件声明启用；之后尊重插件中心的启用选择。
+源码开发时，在宿主插件中心手动启用本插件。市场安装与旧配置升级沿用宿主的安装、启用流程。
 在托管列表正常新建 MAA，使用原有的托管、账号、养成和计划界面。旧托管、账号与计划的 UID 和配置保持不变。
 不再提供“创建测试托管”的临时设置入口。
 
 ## 归属与运行
 
 - `src/maa_adapter` 持有完整模型、专项 API、配置恢复、作业平台、更新、养成、日志观察与执行逻辑。
-- `frontend` 持有编辑页、计划表、养成组件、专项组合函数、元数据及图标；当前由宿主前端构建收集入口，随桌面应用交付，Python wheel 不替换桌面渲染产物。
+- 主程序的 `frontend/src/views/maa` 暂时持有编辑页、计划表、养成组件、专项组合函数、元数据及图标，页面入口随插件能力开放。动态页面上线后再迁回插件。
 - `i18n` 持有 MAA 专属界面词条，公共词条仍使用 core。HTTP 路径和路由名保留原有公开契约，插件停用后专项 HTTP 路径随调用门排空后卸载。
 - L2 持有托管锁、预下载会话与本次进程归属，停止前先确认安装停写和配置保存；L3 使用 `UserExpander`，L4 使用 `ModeWorker`，用户锁内完成恢复。
 - 自动代理继续复用宿主的模拟器、通知、历史及社区公共服务；没有创建游戏适配插件。
@@ -70,12 +70,6 @@ src/maa_adapter/
   logs/              MAA 输出解析、统计和截图
   api/               按业务拆分的 HTTP 端点及端点专用模型
   notifications.py   MAA 专属报告内容，投递仍直接使用宿主 Notify
-frontend/
-  entry.ts           唯一前端能力声明
-  plan/              计划表数据协调
-  script/            托管编辑
-  user/              账号编辑与养成组件
-  composables/       插件 API 与编辑会话调用
 ```
 
 配置和查看分别由 `tasks/config_session.py`、`tasks/view_session.py` 提供入口，
@@ -92,7 +86,7 @@ MAA 官方资源，以 `MaaPluginConfig.stage_cache` 保存正文、ETag 和检�
 
 插件注册 `/api/plugin/maa_adapter/stages/options` 和 `/stages/overview`，
 账号及计划表的主备关卡字段均以 `select(endpoint=...)` 声明选项接口。
-当前前端直接使用生成的插件 API 客户端，保留现有编辑器和自定义关卡；
+当前主程序前端直接使用生成的插件 API 客户端，保留现有编辑器和自定义关卡；
 没有接入动态 UI。宿主不再保存关卡缓存，也不保留旧关卡号接口。
 
 ## 验证入口
@@ -104,7 +98,18 @@ $env:AUTO_MAS_HOST_SOURCE = "D:/Dev/AUTO-MAS"
 & "$env:AUTO_MAS_HOST_SOURCE/.venv/Scripts/python.exe" -m pytest tests -q
 ```
 
-宿主侧保留更广的专项回归：`uv run --no-sync python -m pytest tests/task -k maa plugins/maa_adapter/tests -q`。
+宿主侧先运行 `uv run --no-sync python scripts/prepare_test_plugins.py` 准备已发布的测试插件，
+再运行 `uv run --no-sync python -m pytest tests/task -k maa -q`。
 
 浏览器通过 `frontend/e2e/run.mjs` 运行 `@plugins|@maa-plan-display|@maa-update`。
 进程、网络及设备边界采用隔离替身的检查不代表真实 MAA、游戏或模拟器验收。
+
+## 本地开发
+
+将本仓库克隆到宿主的 `plugins/maa_adapter`，然后启动宿主并在插件中心启用。
+该目录由宿主 Git 忽略，开发完成后在此独立仓库内提交、推送和发布。
+主程序仓库只跟踪 `plugins/auto_mas_core`，SDK 随主程序更新。
+
+Runtime 用户将源码放在安装根目录的 `plugins/maa_adapter`。后端代码位于 `repo`，
+Runtime 更新和切换源码时保留根目录的插件目录，宿主从该目录发现用户插件。
+本地源码优先于同 ID 的发行包。验证市场发行包时，先停止后端，将本地源码移出插件扫描目录后再启动。

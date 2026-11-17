@@ -19,3 +19,6 @@ node_modules/
 /debug/
 /history/
 /temp/
+
+# MAA 静态前端暂由主程序仓库维护。
+/frontend/

@@ -28,7 +28,3 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 maa_adapter = ["py.typed", "native/*.json", "i18n/*.json"]
-
-[tool.auto-mas]
-bundled = true
-default-enabled = true
