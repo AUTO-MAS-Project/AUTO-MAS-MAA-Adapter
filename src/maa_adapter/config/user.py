@@ -11,7 +11,6 @@ from auto_mas_core.host.config import (
     ConfigCollection,
     ConfigEntry,
     ConfigGroup,
-    FieldChangeEvent,
     UiVisibility,
     Virtual,
     collection,
@@ -608,29 +607,8 @@ class MaaUserConfig(UserEntry):
                 type(self).model_validate(data), check_visibility=check_visibility
             )
 
-    @staticmethod
-    async def check_native_source(sender: object, event: FieldChangeEvent) -> None:
-        """原生来源变更时检查同托管其他账号，冲突由配置事务回退本次字段写入。"""
-        user = cast(MaaUserConfig, sender)
-        users = user.parent
-        if event.value != _utils_constants.BASE_NATIVE or users is None:
-            return
-        if any(
-            sibling.uid != user.uid
-            and sibling.Info.Base == _utils_constants.BASE_NATIVE
-            for sibling in cast(ConfigCollection[MaaUserConfig], users).values()
-        ):
-            raise ValueError(
-                "每个托管仅允许一个原生来源账号, 多账号请在该账号的实例管理中配置"
-            )
-
     async def _activate_from_payload(self, payload, *, regenerate_uuids=False):
         """先迁移来源账号配置，再交给配置框架激活节点及处理标识重建。"""
         await super()._activate_from_payload(
             type(self).normalize_payload(payload), regenerate_uuids=regenerate_uuids
         )
-
-
-MaaUserConfig.connect(
-    MaaUserConfig.check_native_source, phase="runtime", group="Info", field="Base"
-)
