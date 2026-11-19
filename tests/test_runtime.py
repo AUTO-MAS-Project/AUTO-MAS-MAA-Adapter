@@ -15,6 +15,18 @@ from tests.support.maa_runtime import runtime as runtime
 
 
 @pytest.mark.asyncio
+async def test_second_account_can_switch_to_native_configuration(runtime):
+    users = runtime.script.users
+    uid = users.add(MaaUserConfig, payload={"Info": {"Base": "shared"}})
+    await users.commit()
+
+    account = users[uid]
+    await account.update(MaaUserConfig.model_validate({"Info": {"Base": "native"}}))
+
+    assert account.Info.Base == runtime.user.Info.Base == "native"
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("mode", [TaskMode.SCRIPT_CONFIG, TaskMode.SCRIPT_VIEW])
 @pytest.mark.parametrize("account", [True, False])
 async def test_session_uses_real_dispatch_and_preserves_native_config(
