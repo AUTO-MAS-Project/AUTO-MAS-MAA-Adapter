@@ -18,6 +18,7 @@ keywords = [
 dependencies = ["auto-mas-core>=5.9.0b1,<6"]
 
 [project.urls]
+Changelog = "https://github.com/AUTO-MAS-Project/AUTO-MAS-MAA-Adapter/blob/master/CHANGELOG.md"
 Homepage = "https://github.com/AUTO-MAS-Project/AUTO-MAS-MAA-Adapter"
 Repository = "https://github.com/AUTO-MAS-Project/AUTO-MAS-MAA-Adapter"
 Documentation = "https://github.com/AUTO-MAS-Project/AUTO-MAS-MAA-Adapter/blob/master/README.md"
