@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import cast
 
 from auto_mas_core import AutoProxyWorker, TaskMode
+from auto_mas_core.devices.task import game_device_id
 from auto_mas_core.host.core import Config, Notify, Publisher
 from auto_mas_core.host.core_history import aggregate_data
 from auto_mas_core.host.core_notify_task_content import (
@@ -62,7 +63,6 @@ from auto_mas_core.host.task_proxy_helpers import (
 )
 from auto_mas_core.host.utils import LogMonitor, ProcessManager, get_logger, process
 from auto_mas_core.host.utils import constants as _utils_constants
-from auto_mas_core.host.utils import emulator2 as _utils_emulator2
 from auto_mas_core.host.utils import io as _utils_io
 
 from maa_adapter import notifications as _format_maa
@@ -219,7 +219,6 @@ class AutoProxyTask(MaaWorkerContext, AutoProxyWorker):
 
         self.script_config = expander.script_config
         self.accounts = expander.script_config.users
-        self.emulator_manager = expander.emulator_manager
         self.capture_adb = capture_adb
         self.history = expander.history
         self.game_update_result = expander.game_update_results.get(config.Info.Server)
@@ -420,10 +419,13 @@ class AutoProxyTask(MaaWorkerContext, AutoProxyWorker):
                 )
 
                 try:
-                    emulator_info = await self.emulator_manager.open(
-                        self.script_config.Emulator.Index,
+                    emulator = self.emulator
+                    if emulator is None:
+                        raise ValueError("MAA 代理缺少已绑定的模拟器实例")
+                    emulator_info = await emulator.open(
+                        game_device_id(self.script_config),
                         ARKNIGHTS_PACKAGE_NAME[self.cur_user_config.Info.Server],
-                        **mod_avd_open_kwargs(self.emulator_manager, allowed=True),
+                        **mod_avd_open_kwargs(emulator, allowed=True),
                     )
                     self.emulator_info = emulator_info
                 except Exception as e:
@@ -456,13 +458,13 @@ class AutoProxyTask(MaaWorkerContext, AutoProxyWorker):
                     continue
 
                 logger.info(
-                    f"模拟器启动完成: 账号 {self.cur_user_uid} - 模式 {self.phase} - 实例 {self.script_config.Emulator.Index} - ADB {emulator_info.adb_address}"
+                    f"模拟器启动完成: 账号 {self.cur_user_uid} - 模式 {self.phase} - 实例 {game_device_id(self.script_config)} - ADB {emulator_info.adb_address}"
                 )
 
                 if Config.setting.Function.IfSilence:
                     try:
-                        await self.emulator_manager.setVisible(
-                            self.script_config.Emulator.Index, False
+                        await emulator.setVisible(
+                            game_device_id(self.script_config), False
                         )
                     except Exception as e:
                         logger.opt(exception=True).warning(f"模拟器隐藏失败: {e}")
@@ -1703,17 +1705,18 @@ class AutoProxyTask(MaaWorkerContext, AutoProxyWorker):
         控制台端口和 adb 都问 modavd（``modavd list``；根目录可以设 ``portBase`` 换一段端口），假 MuMu
         截图组件按控制台端口找共享内存。
         """
-        index = self.script_config.Emulator.Index
-        device_ref = resolve_device_ref(self.emulator_manager, index)
+        index = game_device_id(self.script_config)
+        emulator = self.emulator
+        if emulator is None:
+            return None
+        device_ref = resolve_device_ref(emulator, index)
         if device_ref is None or device_ref.emulator_type != "avd":
             return None
-        adb_info = await self.emulator_manager.avd_adb_info(index)
+        adb_info = await emulator.avd_adb_info(index)
         if adb_info is None:
             raise RuntimeError(f"设备 {index} 不是 ModAVD 实例")
         return (
-            _utils_emulator2.avd.components.root_from_manager_exe(
-                device_ref.manager_path
-            ),
+            emulator.installation_root(index),
             adb_info.ports.console,
             adb_info.adb_exe,
         )
@@ -1723,7 +1726,7 @@ class AutoProxyTask(MaaWorkerContext, AutoProxyWorker):
         server（``modavd servers`` 报的 ``script_adb_server_port``，默认 20049），不落到 5037；其余模拟器返回 ``None``，
         照旧继承 MAS 的环境。"""
         return await script_process_env(
-            self.emulator_manager, self.script_config.Emulator.Index
+            self.emulator, game_device_id(self.script_config)
         )
 
     def _configure_maa_runtime(
@@ -1761,16 +1764,17 @@ class AutoProxyTask(MaaWorkerContext, AutoProxyWorker):
             )
         else:
             # 先按所选实例解析安装，避免多安装管理器沿用上一次命中的 ADB。
+            emulator = self.emulator
+            if emulator is None:
+                raise ValueError("无法解析所选模拟器实例，请检查模拟器配置")
             device_ref = resolve_device_ref(
-                self.emulator_manager, self.script_config.Emulator.Index
+                emulator, game_device_id(self.script_config)
             )
             # 自定义管理器可无专用引用，多安装管理器仍须解析所选安装。
-            if device_ref is None and isinstance(
-                self.emulator_manager, _utils_emulator2.facade.Emulator2Manager
-            ):
+            if device_ref is None:
                 raise ValueError("无法解析所选模拟器实例，请检查模拟器配置")
             connect_settings = current_gui["ConnectSettings"]
-            adb_path = self.emulator_manager.get_adb_path()
+            adb_path = emulator.get_adb_path()
             if (
                 adb_path is None
                 and device_ref is not None
@@ -2165,10 +2169,11 @@ class AutoProxyTask(MaaWorkerContext, AutoProxyWorker):
         if shot is not None:
             return shot
         # ModAVD 实例：截图走 ``modavd adb``（ModAVD 的私有 server，它的 adb 不能落到 5037）。
+        emulator = self.emulator
         host_adb = await resolve_host_adb(self)
         image = await capture_current_image(
             capture_adb=self.capture_adb,
-            adb_path=self.emulator_manager.get_adb_path(),
+            adb_path=emulator.get_adb_path() if emulator is not None else None,
             adb_address=self.emulator_info.adb_address
             if self.emulator_info is not None
             else "",

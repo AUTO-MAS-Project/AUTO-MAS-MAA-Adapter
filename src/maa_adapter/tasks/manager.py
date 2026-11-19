@@ -21,11 +21,12 @@ from functools import partial
 from pathlib import Path
 
 from auto_mas_core import TaskMode, UserExpander
+from auto_mas_core.devices.task import game_device_id, game_target_id
 from auto_mas_core.host.config import config_manager
 from auto_mas_core.host.core import (
     Config,
-    EmulatorManager,
     GameMaintenance,
+    GameManager,
     Notify,
     Publisher,
 )
@@ -286,10 +287,10 @@ class MaaManager(UserExpander[MaaConfig]):
         # 更新与代理分开执行，但更新期间仍保护设备配置，避免安装到变更后的实例。
         self.config_lock_acquired = True
         try:
-            device_provider = (
-                self._device_provider or EmulatorManager.get_emulator_instance
-            )
-            emulator = await device_provider(str(script_config.Emulator.Id))
+            device_provider = self._device_provider or GameManager.get_emulator_instance
+            emulator = await device_provider(str(game_target_id(script_config)))
+            if emulator is None:
+                raise ValueError("游戏更新缺少已绑定的模拟器实例")
             servers = dict.fromkeys((user.Info.Server for _, user in selected))
             for server in servers:
                 update_task = EmulatorGameUpdateTask(
@@ -323,7 +324,7 @@ class MaaManager(UserExpander[MaaConfig]):
         script_config = Config.ScriptConfig[uuid.UUID(self.script_info.info.script_id)]
         if not isinstance(script_config, MaaConfig):
             return "托管配置类型错误, 不是MAA托管类型"
-        if script_config.Emulator.Id == "-" or script_config.Emulator.Index in [
+        if game_target_id(script_config) == "-" or game_device_id(script_config) in [
             "",
             "-",
         ]:
@@ -398,9 +399,9 @@ class MaaManager(UserExpander[MaaConfig]):
         self.temp_path = Path.cwd() / f"data/{self.script_info.info.script_id}/Temp"
 
         # 初始化模拟器管理器
-        device_provider = self._device_provider or EmulatorManager.get_emulator_instance
-        self.emulator_manager = await device_provider(
-            str(self.script_config.Emulator.Id)
+        device_provider = self._device_provider or GameManager.get_emulator_instance
+        self._emulator_override = await device_provider(
+            str(game_target_id(self.script_config))
         )
 
         # 先处置上次崩溃残留的快照, 再备份原始配置。无条件清空会把崩溃后唯一

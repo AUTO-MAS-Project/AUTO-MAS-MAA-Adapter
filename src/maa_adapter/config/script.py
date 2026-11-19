@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from copy import deepcopy
 from typing import Annotated, ClassVar, Literal
-from uuid import UUID
 
 from auto_mas_core import ScriptEntry
 from auto_mas_core.host.config import (
@@ -11,7 +10,6 @@ from auto_mas_core.host.config import (
     Virtual,
     collection,
     encrypted,
-    ref,
     virtual_field,
 )
 from auto_mas_core.host.config_types import (
@@ -29,20 +27,6 @@ class MaaConfig(ScriptEntry):
     "MAA配置"
 
     related_config: ClassVar = {}
-
-    class EmulatorFields(ConfigGroup):
-        Id: Annotated[
-            UUID | str,
-            ref(
-                "EmulatorConfig",
-                default="-",
-                allow_values=("-",),
-                display_field="Info.Name",
-            ),
-        ] = Field(default_factory=lambda: "-", description="模拟器 ID")
-        Index: str = Field(default_factory=lambda: "-", description="模拟器索引")
-
-    Emulator: EmulatorFields = Field(default_factory=EmulatorFields)
 
     class InfoFields(ConfigGroup):
         Name: str = Field(
@@ -124,10 +108,6 @@ class MaaConfig(ScriptEntry):
     Update: UpdateFields = Field(default_factory=UpdateFields)
     # collection 在运行时将类型域限定为 MaaUserConfig；可变泛型的继承检查不表达该约束。
     users: ConfigCollection[MaaUserConfig] = collection(MaaUserConfig)  # pyright: ignore[reportIncompatibleVariableOverride]
-
-    def get_emulator_binding(self) -> tuple[str | UUID, str]:
-        """[兼容旧模拟器] 为设备反查提供已保存的绑定，执行与实例能力仍由 MAA 任务负责。"""
-        return self.Emulator.Id, self.Emulator.Index
 
     @classmethod
     def normalize_payload(cls, data):

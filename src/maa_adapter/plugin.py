@@ -2,7 +2,13 @@
 
 from datetime import datetime, timezone
 
-from auto_mas_core import Config, ScriptAdapterPlugin, ScriptTypeDecl, TaskMode
+from auto_mas_core import (
+    Config,
+    EmulatorExpect,
+    ScriptAdapterPlugin,
+    ScriptTypeDecl,
+    TaskMode,
+)
 from fastapi import APIRouter
 
 from maa_adapter.api import router as maa_router
@@ -21,6 +27,20 @@ router = APIRouter()
 router.include_router(maa_router, prefix="/api/scripts", tags=["脚本管理"])
 router.include_router(stage_router)
 router.include_router(backup_router)
+
+
+def maa_expect(entry):
+    """沿用来源分支的 MAA 设备要求，用户守卫基准先于本轮临时设置生效。"""
+    return EmulatorExpect(
+        width=1280,
+        height=720,
+        keep_alive=True,
+        high_frame_rate=False,
+        vertical_sync=False,
+        display_fps=False,
+        auto_rotate=False,
+        vram_strategy=("auto", "perf"),
+    )
 
 
 class Plugin(ScriptAdapterPlugin):
@@ -43,14 +63,17 @@ class Plugin(ScriptAdapterPlugin):
             TaskMode.SCRIPT_VIEW,
         ),
         prefetch_check=check_prefetch,
+        expect_builder=maa_expect,
         activity_game="arknights",
+        game_kinds=("emulator",),
+        supports_mod_avd=True,
     )
 
     async def pre_enable(self):
         """领域配置激活前绑定 MAA 使用的关联集合，使历史配置引用原样恢复。"""
         refs = {
             "PlanConfig": Config.PlanConfig,
-            "EmulatorConfig": Config.EmulatorConfig,
+            "games": Config.GameConfig,
         }
         MaaConfig.related_config = refs
         MaaUserConfig.related_config = refs
