@@ -88,6 +88,7 @@ class Plugin(ScriptAdapterPlugin):
             now=lambda: datetime.now(timezone.utc),
             background_tasks=self.background_tasks,
         )
+        MaaUserConfig.activity_stage_reader = self.stage_service.cached_activity_stages
         await self.stage_service.get_stage(wait_stale=False)
 
     async def stage_data(self, *, refresh=False):

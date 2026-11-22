@@ -58,6 +58,8 @@ class MaaUserConfig(UserEntry):
     "MAA账号配置"
 
     related_config: ClassVar = {}
+    # 插件启用时注入：按区服只读缓存取当期活动关卡，未启用时没有活动标签。
+    activity_stage_reader: ClassVar = None
 
     class DataFields(ConfigGroup):
         def _game_day_timezone(self):
@@ -492,6 +494,9 @@ class MaaUserConfig(UserEntry):
                     for stage_key in MAA_STAGE_KEY[2:]
                 }
                 tag_color = "green"
+        activity_first = self._activity_first_stage()
+        if activity_first:
+            tags.append({"text": f"活动优先：{activity_first}", "color": "orange"})
         tags.append({"text": f"主关卡：{plan_data['Stage']}", "color": tag_color})
         backup_stages = [
             plan_data[f"Stage_{i}"]
@@ -504,6 +509,24 @@ class MaaUserConfig(UserEntry):
             )
         tags.append(_tag_notes(self))
         return json.dumps(tags, ensure_ascii=False)
+
+    def _activity_first_stage(self) -> str | None:
+        """活动关均衡理智开启时，返回当期勾选的最上面一个活动关；无活动或全未勾选时为空。"""
+        reader = type(self).activity_stage_reader
+        if not self.Task.IfEventDepotMaintain or reader is None:
+            return None
+        from maa_adapter.cultivate.activity_inventory import (
+            resolve_activity_inventory_plans,
+        )
+
+        try:
+            plans, _ = resolve_activity_inventory_plans(
+                self.Task.EventDepotMaintainPlans, reader(self.Info.Server)
+            )
+        except Exception:
+            # 标签只作提示，缓存或计划异常时不显示，不影响其它标签。
+            return None
+        return plans[0]["Stage"] if plans else None
 
     @staticmethod
     def get_stage_zh(stage: str) -> str:
