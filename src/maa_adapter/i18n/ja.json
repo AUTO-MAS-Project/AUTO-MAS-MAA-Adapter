@@ -52,7 +52,7 @@
   "plugins.maa_adapter.edit.maaCultivateImportUnnamed": "名前未入力",
   "plugins.maa_adapter.edit.maaCultivateImportUnsupported": "未対応の目標が含まれています。ツールボックスの「MAA にエクスポート」で育成目標をコピーしてください",
   "plugins.maa_adapter.edit.maaCultivateImporting": "インポート中",
-  "plugins.maa_adapter.edit.maaCultivateManageHint": "Skland 連携が必要。有効化すると昇進2 Lv.1 / スキル Lv.7 目標を既存目標を上書きせず自動追加します。解除時は自動追加のみ停止します。",
+  "plugins.maa_adapter.edit.maaCultivateManageHint": "Skland 連携が必要。有効化すると昇進2 Lv.1 / スキル Lv.7 目標（低レアは到達上限）を既存目標を上書きせず自動追加します。解除時は自動追加のみ停止します。",
   "plugins.maa_adapter.edit.maaCultivateManageReloadFailed": "管理状態は保存されましたが、目標を再読込できませんでした。ページを更新してください。",
   "plugins.maa_adapter.edit.maaCultivateManaged": "管理中",
   "plugins.maa_adapter.edit.maaCultivateMasterySkillHint": "特化にはスキルレベル7が必要です。特化目標を選ぶとスキルレベルの目標が自動で7になり、特化目標を解除してもスキルレベルの目標は残ります。",

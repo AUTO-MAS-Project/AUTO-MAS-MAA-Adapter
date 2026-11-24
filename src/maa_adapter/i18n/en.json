@@ -52,7 +52,7 @@
   "plugins.maa_adapter.edit.maaCultivateImportUnnamed": "Operator name missing",
   "plugins.maa_adapter.edit.maaCultivateImportUnsupported": "Unsupported targets. Copy training targets using the toolbox’s “Export to MAA”",
   "plugins.maa_adapter.edit.maaCultivateImporting": "Importing",
-  "plugins.maa_adapter.edit.maaCultivateManageHint": "Requires Skland binding. Automatically adds E2 Lv.1 / Skill Lv.7 targets without overwriting existing ones; turning off only stops auto-adding.",
+  "plugins.maa_adapter.edit.maaCultivateManageHint": "Requires Skland binding. Auto-adds E2 Lv.1 / Skill Lv.7 targets (capped for lower rarities) without overwriting existing ones; turning off only stops auto-adding.",
   "plugins.maa_adapter.edit.maaCultivateManageReloadFailed": "Management was saved, but goals could not be reloaded. Refresh the page to view them.",
   "plugins.maa_adapter.edit.maaCultivateManaged": "Managed",
   "plugins.maa_adapter.edit.maaCultivateMasterySkillHint": "Mastery requires skill rank 7. Selecting a mastery target automatically sets the skill rank target to 7; clearing the mastery target leaves the skill rank target unchanged.",

@@ -52,7 +52,7 @@
   "plugins.maa_adapter.edit.maaCultivateImportUnnamed": "未填写干员名称",
   "plugins.maa_adapter.edit.maaCultivateImportUnsupported": "含不支持的目标，请复制工具箱“导出 MAA”的养成目标",
   "plugins.maa_adapter.edit.maaCultivateImporting": "导入中",
-  "plugins.maa_adapter.edit.maaCultivateManageHint": "需绑定森空岛；开启后自动为干员补充精二 1 级 / 技能 7 级目标，不覆盖已有目标；关闭仅停止自动补充。",
+  "plugins.maa_adapter.edit.maaCultivateManageHint": "需绑定森空岛；开启后自动补充精二 1 级 / 技能 7 级目标（低星按可达上限），不覆盖已有目标；关闭仅停止自动补充。",
   "plugins.maa_adapter.edit.maaCultivateManageReloadFailed": "托管状态已保存，但目标回读失败，请刷新页面查看。",
   "plugins.maa_adapter.edit.maaCultivateManaged": "托管中",
   "plugins.maa_adapter.edit.maaCultivateMasterySkillHint": "专精需要技能 7 级；选择专精目标会自动将技能等级目标设为 7，清除专精目标不会自动清除技能目标。",
