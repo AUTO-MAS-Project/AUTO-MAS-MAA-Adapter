@@ -32,7 +32,6 @@
                 <template #label>
                   <FieldLabelWithHint
                     :text="t('core.edit.scriptName')"
-                    :hint="t('core.edit.giveScriptNameYou')"
                     variant="form"
                   />
                 </template>
@@ -107,7 +106,6 @@
                 <template #label>
                   <FieldLabelWithHint
                     :text="t('core.edit.accountSwitchingMethod')"
-                    :hint="t('core.edit.whatDoWhenSwitching')"
                     variant="form"
                   />
                 </template>
