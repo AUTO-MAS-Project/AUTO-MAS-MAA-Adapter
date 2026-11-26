@@ -67,7 +67,6 @@
           <template #label>
             <FieldLabelWithHint
               :text="t('core.edit.server')"
-              :hint="t('core.edit.pickGameServerThis')"
               variant="form"
             />
           </template>
