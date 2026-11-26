@@ -125,9 +125,13 @@ from maa_adapter.logs.parsing import (
 )
 from maa_adapter.logs.screenshot import capture_current_image, collect_maa_failure_image
 from maa_adapter.native.avd import (
+    MODAVD_EXTRAS_LIBRARY,
     build_maa_connect_settings,
     ensure_mumu_shim,
+    maa_supports_native_modavd,
+    modavd_extras_library,
     screencap_fallback_status,
+    use_native_modavd,
 )
 from maa_adapter.native.backup import (
     archive_mas_runtime_backup,
@@ -1750,17 +1754,34 @@ class AutoProxyTask(MaaWorkerContext, AutoProxyWorker):
         if emulator_info.adb_address != "Unknown":
             current_gui["ConnectSettings"]["Address"] = emulator_info.adb_address
 
-        # ModAVD 实例：MAA 走假 MuMu 截图通道（MuMu 12 预设 + 桥接 + 实例号 = 控制台端口），
+        # ModAVD 实例：MAA 支持原生 ModAVD 连接（v6.22.1-beta.1 起）且根目录带截图库时走原生
+        # 连接，否则走假 MuMu 截图通道（MuMu 12 预设 + 桥接 + 实例号 = 控制台端口）；
         # 雷电 / MuMu 实例不经过这里。这些键和上面的地址一样，由原生配置快照在任务结束后还原。
         self._avd_screencap_guard = avd is not None
+        self._avd_native = False
         if avd is not None:
             avd_root, avd_console, avd_adb = avd
-            ensure_mumu_shim(avd_root)
+            native = use_native_modavd(self.maa_root_path, avd_root)
+            self._avd_native = native
+            if native:
+                logger.info(
+                    f"ModAVD 实例（控制台端口 {avd_console}）：MAA 截图走原生 ModAVD 连接"
+                )
+            else:
+                ensure_mumu_shim(avd_root)
+                logger.info(
+                    f"ModAVD 实例（控制台端口 {avd_console}）：MAA 截图走假 MuMu 通道"
+                    f"（原生连接要求 MAA 支持 ModAVD 连接配置："
+                    f"{maa_supports_native_modavd(self.maa_root_path)}，"
+                    f"根目录有 {MODAVD_EXTRAS_LIBRARY}："
+                    f"{modavd_extras_library(avd_root).is_file()}）"
+                )
             current_gui["ConnectSettings"] = build_maa_connect_settings(
-                avd_root, avd_console, current_gui.get("ConnectSettings"), avd_adb
-            )
-            logger.info(
-                f"ModAVD 实例（控制台端口 {avd_console}）：MAA 截图走假 MuMu 通道"
+                avd_root,
+                avd_console,
+                current_gui.get("ConnectSettings"),
+                avd_adb,
+                native=native,
             )
         else:
             # 先按所选实例解析安装，避免多安装管理器沿用上一次命中的 ADB。
@@ -2017,7 +2038,7 @@ class AutoProxyTask(MaaWorkerContext, AutoProxyWorker):
 
         # ModAVD 实例上截图不许回落到普通 adb（约 250 ms，账号 09-26 定「不如不做」）
         avd_fallback = (
-            screencap_fallback_status(log)
+            screencap_fallback_status(log, native=getattr(self, "_avd_native", False))
             if getattr(self, "_avd_screencap_guard", False)
             else None
         )
