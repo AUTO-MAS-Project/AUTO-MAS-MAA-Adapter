@@ -45,12 +45,27 @@ MuMu12Extra.cs``、MaaCore ``Controller/AdbController.cpp``）：
 MAA v6.19.0 复核过：上面的新键名与取值不变；MaaCore 先找 ``nx_device\\15.0``、``nx_device\\12.0``
 下的 DLL，最后才是 ``shell\\sdk``，假目录只放最后这一处也能加载；触控多了 ``MumuExtras`` 一档，
 ``TouchMode = MaaTouch`` 时 GUI 传给 MaaCore 的 ``touch`` 为假，仍走 maatouch。
+
+**原生 ModAVD 连接（MAA v6.22.1-beta.1 起，正式版 v6.23.0 起）**：MAA 自己加了连接配置
+``ModAVD`` 和截图方式 ``ModAvdExtras``（MaaAssistantArknights#19178），由 MaaCore 载入
+``<ModAVD 根目录>\\extras\\modavd_extras.dll``（ModAVD 0.39.0 起整包自带）。按 MAA v6.23.2 源码
+（``ConnectSettings.cs`` 的 ``ExtraConfigs.ModAvd`` 序列化名 ``ModAVD``、``ModAvdExtra.cs``、
+``AsstProxy.cs``）写：
+
+- ``Config = ModAVD``；
+- ``Extras.ModAVD = {RootPath}``：只要根目录，实例由连接地址推出，不要实例号；
+- ``TouchMode = MaaTouch``：另有 ``ModAvdExtras``（「ModAVD 触控」），MAA 标为实验功能，先不用；
+- ``AutoDetect = false``，同上。
+
+MAA 的 ``resource\\config.json`` 连接配置里有 ``ModAVD``、根目录下也有这个库时走原生连接，
+否则（旧 MAA，或没带库的旧 ModAVD）照旧走上面的假 MuMu 通道。
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import re
 import shutil
 from pathlib import Path
 from typing import Any
@@ -68,6 +83,39 @@ MUMU_SHIM_DIR = "mumu-shim"
 #: MAA 的触控模式（``TouchMode`` 枚举名，gui.new.json 存的就是名字）。
 MAA_TOUCH_MODE = "MaaTouch"
 MAA_CONNECT_CONFIG = "MuMuEmulator12"
+
+#: MAA 原生的 ModAVD 连接配置名（``ConnectSettings.Config``，也是 ``Extras`` 下的键）。
+MAA_MODAVD_CONNECT_CONFIG = "ModAVD"
+#: ModAVD 包里给 MaaCore 载入的截图库（相对根目录）。
+MODAVD_EXTRAS_LIBRARY = Path("extras") / "modavd_extras.dll"
+
+#: ``resource\config.json`` 里的 ``"configName": "ModAVD"``。这份文件带 ``\.`` 一类 Python
+#: json 不认的转义，所以按文本找，不解析。
+_NATIVE_MODAVD_CONFIG_PATTERN = re.compile(r'"configName"\s*:\s*"ModAVD"')
+
+
+def maa_supports_native_modavd(maa_root: str | Path) -> bool:
+    """这份 MAA 有没有原生的 ModAVD 连接配置（v6.22.1-beta.1 起）。读不到文件按没有算。"""
+    try:
+        text = (Path(maa_root) / "resource" / "config.json").read_text(
+            encoding="utf-8-sig", errors="replace"
+        )
+    except OSError:
+        return False
+    return _NATIVE_MODAVD_CONFIG_PATTERN.search(text) is not None
+
+
+def modavd_extras_library(root: str | Path) -> Path:
+    """ModAVD 根目录下给 MaaCore 用的截图库。"""
+    return Path(root) / MODAVD_EXTRAS_LIBRARY
+
+
+def use_native_modavd(maa_root: str | Path, avd_root: str | Path) -> bool:
+    """MAA 支持原生 ModAVD 连接、ModAVD 根目录里也有截图库时为真；否则走假 MuMu 通道。"""
+    return (
+        maa_supports_native_modavd(maa_root)
+        and modavd_extras_library(avd_root).is_file()
+    )
 
 
 def shim_root(root: str | Path) -> Path:
@@ -136,24 +184,35 @@ def build_maa_connect_settings(
     console_port: int,
     current: dict[str, Any] | None,
     adb_path: str | Path,
+    *,
+    native: bool = False,
 ) -> dict[str, Any]:
     """在 ``gui.new.json`` 当前配置的 ``Gui.ConnectSettings`` 上叠加 ModAVD 需要的项。
 
     ``current`` 原样保留其余键（``AdbPath``、``AddressHistory`` 等），只改下面这几项；
     返回新字典，不改入参。``adb_path`` 是 modavd 报的这条安装的 adb（``modavd list`` 的 ``adb_exe``）。
+    ``native`` 为真时用 MAA 原生的 ``ModAVD`` 连接配置（见 :func:`use_native_modavd`），
+    否则用假 MuMu 通道。
     """
     settings = dict(current or {})
     extras = dict(settings.get("Extras") or {})
-    mumu = dict(extras.get(MAA_CONNECT_CONFIG) or {})
-    mumu.update(
-        {
-            "IsEnabled": True,
-            "EmulatorPath": str(shim_root(root)),
-            "EnableBridgeConnection": True,
-            "InstanceIndex": int(console_port),
-        }
-    )
-    extras[MAA_CONNECT_CONFIG] = mumu
+    if native:
+        connect_config = MAA_MODAVD_CONNECT_CONFIG
+        modavd = dict(extras.get(MAA_MODAVD_CONNECT_CONFIG) or {})
+        modavd["RootPath"] = str(Path(root))
+        extras[MAA_MODAVD_CONNECT_CONFIG] = modavd
+    else:
+        connect_config = MAA_CONNECT_CONFIG
+        mumu = dict(extras.get(MAA_CONNECT_CONFIG) or {})
+        mumu.update(
+            {
+                "IsEnabled": True,
+                "EmulatorPath": str(shim_root(root)),
+                "EnableBridgeConnection": True,
+                "InstanceIndex": int(console_port),
+            }
+        )
+        extras[MAA_CONNECT_CONFIG] = mumu
     if not str(settings.get("AdbPath") or "").strip():
         # 用户的 MAA 从没配过 adb（只装了 ModAVD 的新账号）时才补 SDK 自带的 adb；
         # 已经配了的不动——换 adb 可能和雷电 / MuMu 自带的 adb 抢 5037
@@ -162,7 +221,7 @@ def build_maa_connect_settings(
         {
             "AutoDetect": False,
             "AlwaysAutoDetect": False,
-            "Config": MAA_CONNECT_CONFIG,
+            "Config": connect_config,
             "Extras": extras,
             "TouchMode": MAA_TOUCH_MODE,
         }
@@ -170,9 +229,12 @@ def build_maa_connect_settings(
     return settings
 
 
-def screencap_fallback_status(log: str) -> str | None:
-    """ModAVD 实例上 MAA 截图回落到普通 adb 时给运行结果用的说法；没回落返回 ``None``。"""
-    method = detect_screencap_fallback(log)
+def screencap_fallback_status(log: str, *, native: bool = False) -> str | None:
+    """ModAVD 实例上 MAA 截图回落到普通 adb 时给运行结果用的说法；没回落返回 ``None``。
+
+    ``native`` 与 :func:`build_maa_connect_settings` 的同名参数一致：决定该选中哪种截图方式。
+    """
+    method = detect_screencap_fallback(log, native=native)
     if method is None:
         return None
     return (
@@ -201,23 +263,41 @@ MAA_MUMU_NOT_ENABLED_MARKERS = (
     "MuMu スクリーンショットの強化 が有効になっていません",
     "MuMu 스크린샷 강화 기능이 활성화되지 않았습니다",
 )
+#: 原生 ModAVD 连接下应选中的截图方式。
+MAA_MODAVD_EXTRAS_METHOD = "ModAvdExtras"
+#: MAA 提示「ModAVD 截图增强未生效」的各语言开头（取自 MAA v6.23.2 的
+#: ``Connection.ModAVD.ExtrasNotEnabledMessage``，顺序同上）。
+MAA_MODAVD_NOT_ENABLED_MARKERS = (
+    "ModAVD 截图增强未生效",
+    "ModAVD 截圖增強未生效",
+    "ModAVD screenshot enhancement is not working",
+    "ModAVD スクリーンショットの強化が有効になっていません",
+    "ModAVD 스크린샷 강화 기능이 활성화되지 않았습니다",
+)
 
 
-def detect_screencap_fallback(log: str) -> str | None:
+def detect_screencap_fallback(log: str, *, native: bool = False) -> str | None:
     """从 MAA 界面日志判断 ModAVD 实例上截图有没有回落到普通 adb。
 
     回落了返回 MAA 实际选中的方式（给报错用），没回落或还没测完返回 ``None``。
     ModAVD 上普通 adb 截图约 250 ms，用户明确说过「不如不做」，所以一旦回落就要
-    让这次运行失败，而不是静默变慢。
+    让这次运行失败，而不是静默变慢。``native`` 为真时应选中 ``ModAvdExtras``，
+    否则应选中 ``MumuExtras``。
     """
-    if any(marker in log for marker in MAA_MUMU_NOT_ENABLED_MARKERS):
-        return "MuMu 截图增强未生效"
+    if native:
+        markers, expected = MAA_MODAVD_NOT_ENABLED_MARKERS, MAA_MODAVD_EXTRAS_METHOD
+        not_enabled = "ModAVD 截图增强未生效"
+    else:
+        markers, expected = MAA_MUMU_NOT_ENABLED_MARKERS, MAA_MUMU_EXTRAS_METHOD
+        not_enabled = "MuMu 截图增强未生效"
+    if any(marker in log for marker in markers):
+        return not_enabled
     for line in reversed(log.splitlines()):
         if not any(prefix in line for prefix in MAA_FASTEST_SCREENCAP_PREFIXES):
             continue
         head, sep, tail = line.rpartition("(")
         method = tail.rstrip(") \r\n") if sep else ""
-        if method and method != MAA_MUMU_EXTRAS_METHOD:
+        if method and method != expected:
             return method
         return None
     return None
