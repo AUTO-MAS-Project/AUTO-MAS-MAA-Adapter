@@ -5,7 +5,7 @@
 """运行前下载 MAA 官方 OTA / 完整包；解压和安装交给 MAA。
 
 无 CDK 时使用 MAA 官方发行清单，包从对应 GitHub Release 获取。
-下载器独立跟随全局 FluxDown 接管开关，复用 MAS 的续传、回退和历史记录。
+官方 OTA 使用内置下载器识别已失效的资产，完整包仍跟随全局下载器设置。
 待安装字段复用现有透传入口；不修改上游更新器，也不解析更新包内容。
 """
 
@@ -21,9 +21,8 @@ from typing import Literal, overload
 
 import httpx
 from auto_mas_core.host.core import Config
-from auto_mas_core.host.core_script_update import (
-    download_script_package as download_file,
-)
+from auto_mas_core.host.core_downloads import download_file
+from auto_mas_core.host.core_script_update import script_downloader
 from auto_mas_core.host.services_common_update import (
     fluxdown as _service_update_fluxdown,
 )
@@ -109,6 +108,11 @@ _RELEASE_DOWNLOAD = (
     "https://github.com/MaaAssistantArknights/MaaAssistantArknights/releases/download"
 )
 _OTA_DOWNLOAD = "https://github.com/MaaAssistantArknights/MaaRelease/releases/download"
+
+
+def _is_ota(filename: str) -> bool:
+    """只对官方 OTA 使用可直接识别 HTTP 状态的内置下载器。"""
+    return filename.lower().startswith("maacomponent-ota-")
 
 
 async def _select_package(
@@ -306,11 +310,14 @@ async def prepare_maa_fluxdown_update(
                     proxy=Config.proxy,
                     progress=progress,
                     source="GitHub",
+                    downloader="builtin"
+                    if _is_ota(filename)
+                    else script_downloader("GitHub"),
                 )
                 break
             except httpx.HTTPStatusError as error:
                 if (
-                    not filename.lower().startswith("maacomponent-ota-")
+                    not _is_ota(filename)
                     or error.response.status_code != 404
                     or attempt == 2
                 ):
@@ -394,11 +401,16 @@ async def check_update_download(root: Path, config: MaaConfig) -> list:
         raise ValueError("无法比较 MAA 版本")
     if compare_versions(target_version, current_version) <= 0:
         return []
-    _, url = await _select_package(
+    filename, url = await _select_package(
         current=current,
         latest=latest,
         arch=arch,
         channel=channel,
         incremental=config.Update.PackageMode == "incremental",
     )
-    return [DownloadRequest(url=url)]
+    return [
+        DownloadRequest(
+            url=url,
+            downloader="builtin" if _is_ota(filename) else script_downloader("GitHub"),
+        )
+    ]
