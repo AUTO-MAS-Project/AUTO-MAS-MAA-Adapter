@@ -5,7 +5,7 @@
 """运行前下载 MAA 官方 OTA / 完整包；解压和安装交给 MAA。
 
 无 CDK 时使用 MAA 官方发行清单，包从对应 GitHub Release 获取。
-下载器独立跟随全局 FluxDown 接管开关，复用 MAS 的续传、回退和历史记录。
+官方 OTA 使用内置下载器识别已失效的资产，完整包仍跟随全局下载器设置。
 待安装字段复用现有透传入口；不修改上游更新器，也不解析更新包内容。
 """
 
@@ -21,9 +21,8 @@ from typing import Literal, overload
 
 import httpx
 from auto_mas_core.host.core import Config
-from auto_mas_core.host.core_script_update import (
-    download_script_package as download_file,
-)
+from auto_mas_core.host.core_downloads import download_file
+from auto_mas_core.host.core_script_update import script_downloader
 from auto_mas_core.host.services_common_update import (
     fluxdown as _service_update_fluxdown,
 )
@@ -105,19 +104,44 @@ async def query_latest_maa_version(
     return latest
 
 
-async def _select_package(current: str, latest: str, arch: str, channel: str) -> str:
-    """只选与已安装基线精确匹配的官方 OTA；没有该资产时回退完整包。"""
+_RELEASE_DOWNLOAD = (
+    "https://github.com/MaaAssistantArknights/MaaAssistantArknights/releases/download"
+)
+_OTA_DOWNLOAD = "https://github.com/MaaAssistantArknights/MaaRelease/releases/download"
+
+
+def _is_ota(filename: str) -> bool:
+    """只对官方 OTA 使用可直接识别 HTTP 状态的内置下载器。"""
+    return filename.lower().startswith("maacomponent-ota-")
+
+
+async def _select_package(
+    current: str, latest: str, arch: str, channel: str, *, incremental: bool
+) -> tuple[str, str]:
+    """返回包名及官方地址；有匹配基线的 OTA 时优先使用它。"""
     tag = latest if latest.startswith("v") else f"v{latest}"
-    baseline = current if current.startswith("v") else f"v{current}"
     full = f"MAA-{tag}-win-{arch}.zip"
+    full_url = f"{_RELEASE_DOWNLOAD}/{tag}/{full}"
+    if not incremental:
+        return full, full_url
+
+    # MAA.dll 的 ProductVersion 附带构建元数据，官方 OTA 的基线取自 MaaCore。
+    current = current.partition("+")[0]
+    baseline = current if current.startswith("v") else f"v{current}"
     ota = f"MAAComponent-OTA-{baseline}_{tag}-win-{arch}.zip"
     release = await request_maa_release(channel)
     if release.get("version") != latest:
         raise RuntimeError("MAA 发行版本在查询期间发生变化，请重新运行")
     for asset in release.get("details", {}).get("assets", []):
-        if asset.get("name", "").lower() == ota.lower():
-            return ota
-    return full
+        if asset.get("name", "").lower() != ota.lower():
+            continue
+        name = asset["name"]
+        primary_url = f"{_RELEASE_DOWNLOAD}/{tag}/{name}"
+        url = asset.get("browser_download_url", primary_url)
+        if url in (primary_url, f"{_OTA_DOWNLOAD}/{tag}/{name}"):
+            return name, url
+    logger.info(f"MAA {baseline} → {tag} 无可用 {arch} 增量包，回退全量更新")
+    return full, full_url
 
 
 @dataclass(frozen=True)
@@ -251,12 +275,13 @@ async def prepare_maa_fluxdown_update(
             logger.info(f"MAA 已是最新版本（{current}，{channel} 通道）")
             return current
 
-        # 只使用官方规范包名，不接受清单中的任意下载 URL。
         tag = latest if latest.startswith("v") else f"v{latest}"
-        filename = (
-            await _select_package(current, latest, arch, channel)
-            if package_mode == "incremental"
-            else f"MAA-{tag}-win-{arch}.zip"
+        filename, url = await _select_package(
+            current=current,
+            latest=latest,
+            arch=arch,
+            channel=channel,
+            incremental=package_mode == "incremental",
         )
         if download_only:
             cache = Path.cwd() / "data" / "maa_github_update"
@@ -270,7 +295,6 @@ async def prepare_maa_fluxdown_update(
         part = directory / (
             f"{filename}.part" if download_only else f".mas-{filename}.part"
         )
-        url = f"https://github.com/MaaAssistantArknights/MaaAssistantArknights/releases/download/{tag}/{filename}"
         logger.info(f"开始下载 MAA {latest}，完成后交给官方更新器安装")
         for attempt in range(3):
             if not use_maa_github_update(
@@ -286,11 +310,14 @@ async def prepare_maa_fluxdown_update(
                     proxy=Config.proxy,
                     progress=progress,
                     source="GitHub",
+                    downloader="builtin"
+                    if _is_ota(filename)
+                    else script_downloader("GitHub"),
                 )
                 break
             except httpx.HTTPStatusError as error:
                 if (
-                    not filename.startswith("MAAComponent-OTA-")
+                    not _is_ota(filename)
                     or error.response.status_code != 404
                     or attempt == 2
                 ):
@@ -302,7 +329,7 @@ async def prepare_maa_fluxdown_update(
                 part = directory / (
                     f"{filename}.part" if download_only else f".mas-{filename}.part"
                 )
-                url = url.rsplit("/", 1)[0] + "/" + filename
+                url = f"{_RELEASE_DOWNLOAD}/{tag}/{filename}"
             except _service_update_fluxdown.FluxdownResumableError:
                 if attempt == 2:
                     raise
@@ -374,14 +401,16 @@ async def check_update_download(root: Path, config: MaaConfig) -> list:
         raise ValueError("无法比较 MAA 版本")
     if compare_versions(target_version, current_version) <= 0:
         return []
-    tag = latest if latest.startswith("v") else f"v{latest}"
-    filename = (
-        await _select_package(current, latest, arch, channel)
-        if config.Update.PackageMode == "incremental"
-        else f"MAA-{tag}-win-{arch}.zip"
+    filename, url = await _select_package(
+        current=current,
+        latest=latest,
+        arch=arch,
+        channel=channel,
+        incremental=config.Update.PackageMode == "incremental",
     )
     return [
         DownloadRequest(
-            url=f"https://github.com/MaaAssistantArknights/MaaAssistantArknights/releases/download/{tag}/{filename}"
+            url=url,
+            downloader="builtin" if _is_ota(filename) else script_downloader("GitHub"),
         )
     ]
