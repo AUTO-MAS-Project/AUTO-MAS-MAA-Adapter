@@ -54,7 +54,9 @@ MAA v6.19.0 复核过：上面的新键名与取值不变；MaaCore 先找 ``nx_
 
 - ``Config = ModAVD``；
 - ``Extras.ModAVD = {RootPath}``：只要根目录，实例由连接地址推出，不要实例号；
-- ``TouchMode = MaaTouch``：另有 ``ModAvdExtras``（「ModAVD 触控」），MAA 标为实验功能，先不用；
+- ``TouchMode = ModAvdExtras``（「ModAVD 触控」，MAA 标为实验功能）：由同一个库经模拟器控制台发
+  触控，客体里不用跑 maatouch；滑动的斜率、末端补滑、暂停下干员照 MaaTouch 的参数做
+  （``ModAvdController.cpp``），库不支持触控时 MaaCore 自己退回 maatouch；
 - ``AutoDetect = false``，同上。
 
 MAA 的 ``resource\\config.json`` 连接配置里有 ``ModAVD``、根目录下也有这个库时走原生连接，
@@ -82,6 +84,8 @@ MUMU_SHIM_DIR = "mumu-shim"
 
 #: MAA 的触控模式（``TouchMode`` 枚举名，gui.new.json 存的就是名字）。
 MAA_TOUCH_MODE = "MaaTouch"
+#: 原生 ModAVD 连接下的触控模式。
+MAA_MODAVD_TOUCH_MODE = "ModAvdExtras"
 MAA_CONNECT_CONFIG = "MuMuEmulator12"
 
 #: MAA 原生的 ModAVD 连接配置名（``ConnectSettings.Config``，也是 ``Extras`` 下的键）。
@@ -223,7 +227,7 @@ def build_maa_connect_settings(
             "AlwaysAutoDetect": False,
             "Config": connect_config,
             "Extras": extras,
-            "TouchMode": MAA_TOUCH_MODE,
+            "TouchMode": MAA_MODAVD_TOUCH_MODE if native else MAA_TOUCH_MODE,
         }
     )
     return settings

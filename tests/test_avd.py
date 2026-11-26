@@ -94,7 +94,7 @@ def test_native_connect_settings(tmp_path: Path) -> None:
     )
 
     assert settings["Config"] == "ModAVD"
-    assert settings["TouchMode"] == "MaaTouch"
+    assert settings["TouchMode"] == "ModAvdExtras"
     assert settings["AutoDetect"] is False
     assert settings["AlwaysAutoDetect"] is False
     assert settings["Extras"]["ModAVD"] == {"RootPath": str(root), "Other": 1}
