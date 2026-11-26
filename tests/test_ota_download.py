@@ -82,6 +82,8 @@ async def test_official_ota_from_maarelease_used_for_prefetch_and_download(
     [request] = await fluxdown.check_update_download(root, config)
     assert request.url == url
     assert request.downloader == "builtin"
+    assert request.key == "maa:github:software:x64"
+    assert request.rid == f"v6.23.2:{filename}"
     prepared = await fluxdown.prepare_maa_fluxdown_update(
         root, config=config, config_dir=config_dir, download_only=True
     )
