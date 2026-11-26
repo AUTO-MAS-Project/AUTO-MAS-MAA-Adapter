@@ -115,6 +115,11 @@ def _is_ota(filename: str) -> bool:
     return filename.lower().startswith("maacomponent-ota-")
 
 
+def _package_identity(arch: str, version: str, filename: str) -> dict[str, str]:
+    """Group GitHub packages across release URLs and distinguish full and OTA assets."""
+    return {"key": f"maa:github:software:{arch}", "rid": f"{version}:{filename}"}
+
+
 async def _select_package(
     current: str, latest: str, arch: str, channel: str, *, incremental: bool
 ) -> tuple[str, str]:
@@ -313,6 +318,7 @@ async def prepare_maa_fluxdown_update(
                     downloader="builtin"
                     if _is_ota(filename)
                     else script_downloader("GitHub"),
+                    **_package_identity(arch, latest, filename),
                 )
                 break
             except httpx.HTTPStatusError as error:
@@ -412,5 +418,6 @@ async def check_update_download(root: Path, config: MaaConfig) -> list:
         DownloadRequest(
             url=url,
             downloader="builtin" if _is_ota(filename) else script_downloader("GitHub"),
+            **_package_identity(arch, latest, filename),
         )
     ]
