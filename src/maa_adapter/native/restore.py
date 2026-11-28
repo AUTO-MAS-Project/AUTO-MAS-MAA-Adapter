@@ -312,6 +312,7 @@ RESTORE_POOLS = [
     _utils_config_restore.ConfigRestorePool(
         key="mas",
         kind="user",
+        editor_scope="user",
         mas_base="tri_state",
         set_base=_set_base,
         files=_mas_files,
@@ -322,6 +323,7 @@ RESTORE_POOLS = [
     _utils_config_restore.ConfigRestorePool(
         key="native",
         kind="script",
+        editor_scope="user",
         files=_native_files,
         backup_root=_native_root,
         preview=_preview_native,
@@ -333,7 +335,7 @@ RESTORE_POOLS = [
 def restore_service(
     script_id: str, user_id: str, *, force: bool = False
 ) -> _utils_config_restore.ConfigRestoreService:
-    """由 MAA 自行校验配置归属并构造恢复服务，池表不再经过宿主插件声明。"""
+    """为旧 MAA 备份接口校验账号归属并构造同一套恢复服务。"""
     from auto_mas_core import Config
 
     from maa_adapter.config.access import _maa_script_config

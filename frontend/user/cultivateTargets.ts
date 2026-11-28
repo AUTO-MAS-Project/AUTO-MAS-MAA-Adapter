@@ -1,5 +1,10 @@
 // 养成目标 JSON 的解析与序列化
-import type { MaaCultivateOperatorOptionItem } from '@/api'
+type CatalogOption = Partial<Omit<CultivateOperatorCatalogEntry, 'skills' | 'modules'>> & {
+  value: string
+  label: string
+  skills?: (Omit<CultivateGoalOption, 'maxLevel'> & { maxLevel?: number })[]
+  modules?: (Omit<CultivateGoalOption, 'maxLevel'> & { maxLevel?: number })[]
+}
 
 export type CultivateGoalKind = 'elite' | 'skill' | 'mastery' | 'module'
 
@@ -237,7 +242,7 @@ export const mergeCultivateTargets = (
 
 /** 选择器与剪贴板导入共用 API 目录归一化。 */
 export const normalizeCultivateCatalog = (
-  options: MaaCultivateOperatorOptionItem[]
+  options: CatalogOption[]
 ): CultivateOperatorCatalogEntry[] =>
   options
     .filter(option => option.value)

@@ -3,13 +3,15 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Annotated, ClassVar, Literal
 
-from auto_mas_core import ScriptEntry
+from auto_mas_core import DeclarativeBlock, HostBlock, ScriptEntry
 from auto_mas_core.host.config import (
     ConfigCollection,
     ConfigGroup,
+    UiVisibility,
     Virtual,
     collection,
     encrypted,
+    ui,
     virtual_field,
 )
 from auto_mas_core.host.config_types import (
@@ -25,6 +27,12 @@ from maa_adapter.config.user import MaaUserConfig
 
 class MaaConfig(ScriptEntry):
     "MAA配置"
+
+    ui_blocks = (
+        DeclarativeBlock(("Info",)),
+        HostBlock("game_binding"),
+        DeclarativeBlock(("Run", "Update")),
+    )
 
     related_config: ClassVar = {}
 
@@ -86,9 +94,9 @@ class MaaConfig(ScriptEntry):
             default="full",
             description="更新方式：全量或优先增量；增量依赖完整且匹配的基线，必要时回退全量。",
         )
-        TakeoverMigrationVersion: Annotated[int, Field(ge=0, le=1)] = Field(
-            default=1, description="更新接管一次性迁移版本"
-        )
+        TakeoverMigrationVersion: Annotated[
+            int, Field(ge=0, le=1), ui(visibility=UiVisibility.HIDE)
+        ] = Field(default=1, description="更新接管一次性迁移版本")
 
         MirrorChyanCDK: Annotated[str, encrypted()] = Field(
             default_factory=lambda: "",
@@ -101,9 +109,9 @@ class MaaConfig(ScriptEntry):
         Channel: Literal["stable", "beta"] = Field(
             default_factory=lambda: "stable", description="MAA 更新通道：正式版或公测版"
         )
-        ChannelMigrationVersion: Annotated[int, Field(ge=0, le=1)] = Field(
-            default=1, description="更新通道一次性迁移版本"
-        )
+        ChannelMigrationVersion: Annotated[
+            int, Field(ge=0, le=1), ui(visibility=UiVisibility.HIDE)
+        ] = Field(default=1, description="更新通道一次性迁移版本")
 
     Update: UpdateFields = Field(default_factory=UpdateFields)
     # collection 在运行时将类型域限定为 MaaUserConfig；可变泛型的继承检查不表达该约束。

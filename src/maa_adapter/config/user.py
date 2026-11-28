@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Annotated, ClassVar, Literal, Self, cast
 from uuid import UUID
 
-from auto_mas_core import UserEntry
+from auto_mas_core import DeclarativeBlock, HostBlock, PluginBlock, UserEntry
 from auto_mas_core.host.config import (
     ConfigCollection,
     ConfigEntry,
@@ -56,6 +56,16 @@ from maa_adapter.constants import (
 
 class MaaUserConfig(UserEntry):
     "MAA账号配置"
+
+    ui_native_session = "config"
+    ui_blocks = (
+        HostBlock("config_restore"),
+        HostBlock("native_session"),
+        DeclarativeBlock(("Info",)),
+        PluginBlock(page_id="user", fallback_groups=("Stage", "Task")),
+        DeclarativeBlock(("Notify",)),
+        HostBlock("webhooks"),
+    )
 
     related_config: ClassVar = {}
     # 插件启用时注入：按区服只读缓存取当期活动关卡，未启用时没有活动标签。

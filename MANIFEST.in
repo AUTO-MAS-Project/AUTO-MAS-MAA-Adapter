@@ -1,6 +1,8 @@
 include LICENSE README.md CHANGELOG.md
 recursive-include docs *.md
-recursive-include frontend *.ts *.vue *.css *.png *.svg *.json
+recursive-include frontend *.ts *.vue *.html *.css *.png *.svg *.json
+prune frontend/node_modules
+recursive-include src/maa_adapter/ui *
 recursive-include tests *.py
 recursive-include src/maa_adapter *.json py.typed
 global-exclude __pycache__ *.py[cod]
