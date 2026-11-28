@@ -57,6 +57,8 @@ class PlanDaysConfig(PlanEntry):
 
 
 class MaaPlanConfig(PlanDaysConfig):
+    """MAA 计划配置，由插件的 plan 页面绑定编辑。"""
+
     @classmethod
     def normalize_payload(cls, data):
         """将历史 Days 容器展开为当前计划分组，保留所有合法星期和轮换槽位。"""
@@ -69,12 +71,14 @@ class MaaPlanConfig(PlanDaysConfig):
                     data[group] = values
         return data
 
+    def current_game_group(self, server: str | None = None) -> str:
+        """按服务器游戏日定位当前生效的计划分组。"""
+        return self.current_group(game_now(server))
+
     def get_current_info(self, name: str, server: str | None = None):
         """按服务器游戏时间选择当前计划分组，并返回调用方指定的计划字段。"""
-        group = self.current_group(game_now(server))
+        group = self.current_game_group(server)
         return getattr(getattr(self, group), name)
-
-    "MAA计划表配置"
 
     class ALLFields(ConfigGroup):
         MedicineNumb: Annotated[int, Field(ge=0, le=9999), none_as(0)] = Field(

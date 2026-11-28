@@ -68,7 +68,7 @@
         <!-- 模拟器管理 -->
         <div class="form-section">
           <div class="section-header">
-            <h3>{{ t('core.edit.emulators') }}</h3>
+            <h3>{{ t('core.edit.emulator') }}</h3>
           </div>
           <a-row :gutter="24">
             <a-col :span="12">

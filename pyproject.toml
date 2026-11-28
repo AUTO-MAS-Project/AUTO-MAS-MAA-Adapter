@@ -28,7 +28,7 @@ Issues = "https://github.com/AUTO-MAS-Project/AUTO-MAS-MAA-Adapter/issues"
 where = ["src"]
 
 [tool.setuptools.package-data]
-maa_adapter = ["py.typed", "native/*.json", "i18n/*.json"]
+maa_adapter = ["py.typed", "native/*.json", "i18n/*.json", "ui/*", "ui/**/*"]
 
 [tool.auto-mas]
 bundled = true

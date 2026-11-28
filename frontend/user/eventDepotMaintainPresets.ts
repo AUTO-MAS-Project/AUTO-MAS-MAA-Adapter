@@ -1,4 +1,4 @@
-import type { ActivityItem } from '@/types/home'
+type ActivityDrop = { Value: string; Drop: string; DropName: string }
 
 export type EventDepotStageType = 'material' | 'activity' | 'orundum' | 'all'
 export type EventDepotMaintainPlan = {
@@ -19,17 +19,17 @@ export type EventDepotMaintainPlan = {
 export const ORUNDUM_ITEM_ID = '30012'
 
 // 活动列表中的搓玉效率会映射成固源岩 ID，必须同时检查原始掉落文案。
-export const isOrundumStage = (stage: ActivityItem): boolean =>
+export const isOrundumStage = (stage: ActivityDrop): boolean =>
   stage.DropName.includes('玉') || stage.Drop.includes('玉')
 
 // 计划在 MAA 侧实际备料的物品 ID（搓玉关为固源岩）。
-export const eventDepotItemId = (stage: ActivityItem): string =>
+export const eventDepotItemId = (stage: ActivityDrop): string =>
   isOrundumStage(stage) ? ORUNDUM_ITEM_ID : stage.Drop
 
-export const getEventDepotStages = (stages: ActivityItem[]): ActivityItem[] =>
+export const getEventDepotStages = <T extends ActivityDrop>(stages: T[]): T[] =>
   stages.filter(stage => stage.Value && /^\d+$/.test(stage.Drop) && !isOrundumStage(stage))
 
-export const getEventOrundumStages = (stages: ActivityItem[]): ActivityItem[] =>
+export const getEventOrundumStages = <T extends ActivityDrop>(stages: T[]): T[] =>
   stages.filter(stage => stage.Value && isOrundumStage(stage))
 
 // 保存动态模板，活动换期或关卡数量变化时无需重新导入。

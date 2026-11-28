@@ -13,11 +13,13 @@ from fastapi import APIRouter
 
 from maa_adapter.api import router as maa_router
 from maa_adapter.api.backup import router as backup_router
+from maa_adapter.api.editor import router as editor_router
 from maa_adapter.api.stages import router as stage_router
 from maa_adapter.config.plan import MaaPlanConfig
 from maa_adapter.config.plugin import MaaPluginConfig
 from maa_adapter.config.script import MaaConfig
 from maa_adapter.config.user import MaaUserConfig
+from maa_adapter.native.restore import RESTORE_POOLS
 from maa_adapter.stages import fetch_stage
 from maa_adapter.stages.service import MaaStageService
 from maa_adapter.tasks.manager import MaaManager
@@ -25,6 +27,10 @@ from maa_adapter.updates.prefetch import check_prefetch
 
 router = APIRouter()
 router.include_router(maa_router, prefix="/api/scripts", tags=["脚本管理"])
+router.include_router(
+    maa_router, prefix="/api/plugin/maa_adapter", include_in_schema=False
+)
+router.include_router(editor_router)
 router.include_router(stage_router)
 router.include_router(backup_router)
 
@@ -67,6 +73,7 @@ class Plugin(ScriptAdapterPlugin):
         activity_game="arknights",
         game_kinds=("emulator",),
         supports_mod_avd=True,
+        restore_pools=tuple(RESTORE_POOLS),
     )
 
     async def pre_enable(self):
